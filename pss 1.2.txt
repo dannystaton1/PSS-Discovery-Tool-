@@ -1,0 +1,82 @@
+# Perform a ping sweep to identify active devices ## Change subnet to search
+$pingResults = Test-Connection -ComputerName (1..254 | ForEach-Object { "192.168.50.$_" }) -Count 1 -ErrorAction SilentlyContinue |
+               Where-Object { $_.StatusCode -eq 0 } |
+               Select-Object -ExpandProperty Address
+
+#Device password
+$username = 'admin'
+$pass = ''
+
+#$username = 'site usernname'
+#$pass = 'site password'
+
+#HTTP or HTTPS
+$ssl = 'http'
+
+$loginURI = "$ssl"+"://$copierIP/web/guest/en/websys/webArch/login.cgi"
+$authURI = "$ssl"+"://$copierIP/web/guest/en/websys/webArch/authForm.cgi"
+
+# Create an Excel file at this path location
+$excelFilePath = "C:\Users\DStaton\OneDrive - Ricoh\Desktop\PrinterInfo.xlsx"
+$excel = New-Object -ComObject Excel.Application
+$workbook = $excel.Workbooks.Add()
+$worksheetPrinters = $workbook.Worksheets.Item(1)  # Printer info sheet
+$worksheetNonPrinters = $workbook.Worksheets.Add()  # New sheet for non-printers
+
+# Add column headers for printer info
+$worksheetPrinters.Cells.Item(1, 1) = "IP Address"
+$worksheetPrinters.Cells.Item(1, 2) = "Hostname"
+$worksheetPrinters.Cells.Item(1, 3) = "MAC Address"
+$worksheetPrinters.Cells.Item(1, 4) = "Operating System"
+$worksheetPrinters.Cells.Item(1, 5) = "Manufacturer"
+$worksheetPrinters.Cells.Item(1, 6) = "IPv4 Address"
+$worksheetPrinters.Cells.Item(1, 7) = "Subnet Mask"
+$worksheetPrinters.Cells.Item(1, 8) = "Default Gateway"
+$worksheetPrinters.Cells.Item(1, 9) = "FTP Enabled"
+$worksheetPrinters.Cells.Item(1, 10) = "LPR Enabled"
+$worksheetPrinters.Cells.Item(1, 11) = "DIPRINT Enabled"
+$worksheetPrinters.Cells.Item(1, 12) = "WSD Enabled"
+$worksheetPrinters.Cells.Item(1, 13) = "IPP Enabled"
+$worksheetPrinters.Cells.Item(1, 14) = "RHPP Enabled"
+$worksheetPrinters.Cells.Item(1, 15) = "Security Level"
+$worksheetPrinters.Cells.Item(1, 16) = "Password Bypassed"  # New column
+
+# Add column headers for non-printers
+$worksheetNonPrinters.Cells.Item(1, 1) = "IP Address"
+$worksheetNonPrinters.Cells.Item(1, 2) = "Device Type"
+$worksheetNonPrinters.Cells.Item(1, 3) = "Operating System"  # New column
+$worksheetNonPrinters.Cells.Item(1, 4) = "Manufacturer"  # New column
+$worksheetNonPrinters.Cells.Item(1, 5) = "Security Level"  # New column
+
+# Populate the Excel sheets
+$rowPrinter = 2
+$rowNonPrinter = 2
+foreach ($device in $pingResults) {
+    # Retrieve device-specific information (modify as needed)
+    $deviceInfo = Get-WmiObject -ComputerName $device -Class Win32_ComputerSystem
+
+    if ($deviceInfo.Model -like "*Printer*") {
+        # Printer info
+        $worksheetPrinters.Cells.Item($rowPrinter, 1) = $device
+        $worksheetPrinters.Cells.Item($rowPrinter, 2) = $deviceInfo.Name
+        # ... (populate other printer columns)
+        $rowPrinter++
+    } else {
+        # Non-printer info
+        $worksheetNonPrinters.Cells.Item($rowNonPrinter, 1) = $device
+        $worksheetNonPrinters.Cells.Item($rowNonPrinter, 2) = "Non-Printer"
+        $worksheetNonPrinters.Cells.Item($rowNonPrinter, 3) = $deviceInfo.OperatingSystem  # Retrieve OS info
+        $worksheetNonPrinters.Cells.Item($rowNonPrinter, 4) = $deviceInfo.Manufacturer  # Retrieve manufacturer info
+        $worksheetNonPrinters.Cells.Item($rowNonPrinter, 5) = "Unknown"  # Placeholder for security level
+        # ... (populate other non-printer columns)
+        $rowNonPrinter++
+    }
+}
+
+# Save and close the Excel
+$workbook.SaveAs($excelFilePath)
+$workbook.Close()
+$excel.Quit()
+
+
+Write-Host "Printer information exported to $excelFilePath"
